@@ -4,6 +4,9 @@
 package main
 
 func SumAndAverage(numbers []int) (int, int) {
+	if len(numbers) == 0 {
+		return 0, 0
+	}
 	sum := 0
 	for _, num := range numbers{
 		sum += num 

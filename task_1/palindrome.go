@@ -9,7 +9,7 @@ import (
 func CheckPalindrome(a string) bool {
 	chs :=  []rune(a)
 	fmt.Printf("rune : %v\n", a)
-	i, j := 0, len(a)-1
+	i, j := 0, len(chs)-1
 	for i < j {
 		if !unicode.IsLetter(chs[i]) && !unicode.IsDigit(chs[j]) {
 			i++

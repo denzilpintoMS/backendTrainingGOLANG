@@ -14,6 +14,7 @@ func TestFindMinMax(t *testing.T) {
 		{"negative and positive values", []int{-4, 0, 7}, -4, 7},
 		{"same values", []int{2, 2, 2}, 2, 2},
 		{"single value", []int{5}, 5, 5},
+		{"empty input", []int{}, 0, 0},
 	}
 
 	for _, tt := range tests {

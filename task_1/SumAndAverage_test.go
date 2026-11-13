@@ -15,6 +15,7 @@ func TestSumAndAverage(t *testing.T) {
 		{"case 1 happy path", []int{1, 2, 3}, 6, 2},
 		{"case 2 0 values", []int{0, 0, 0, 0}, 0, 0},
 		{"case 3 negative values", []int{-1, -2, 3}, 0, 0},
+		{"empty input", []int{}, 0, 0},
 	}
 
 	for _, tt := range tests {

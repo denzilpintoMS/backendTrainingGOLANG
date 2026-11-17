@@ -1,0 +1,11 @@
+# Local credentials (at any directory depth)
+credentials.txt
+
+# Local environment files and variants such as .env.local and .env.production
+.env
+.env.*
+
+# Keep environment templates available to commit
+!.env.example
+!.env.sample
+!.env.template

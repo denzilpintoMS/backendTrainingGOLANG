@@ -16,10 +16,13 @@ import (
 	"github.com/joho/godotenv"
 )
 
-func newApp(books repository.BookRepository) *fiber.App {
+func newApp(books repository.BookRepository, users repository.UserRepository) *fiber.App {
 	app := fiber.New(fiber.Config{BodyLimit: 1 << 20})
 	handler := &bookHandler{books: books}
+	auth := &authHandler{users: users}
 	api := app.Group("/api/v1")
+	api.Post("/auth/register", auth.register)
+	api.Post("/auth/login", auth.login)
 
 	api.Post("/books", handler.createBook)
 	api.Get("/books/all", handler.listBooks)
@@ -50,7 +53,7 @@ func run() error {
 	if port == "" {
 		port = "8080"
 	}
-	app := newApp(books)
+	app := newApp(books, books)
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 

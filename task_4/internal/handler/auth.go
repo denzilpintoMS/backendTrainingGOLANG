@@ -13,11 +13,15 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 	"golang.org/x/crypto/bcrypt"
+	"task_3/internal/auth"
 	"task_3/internal/model"
 	"task_3/internal/repository"
 )
 
-type AuthHandler struct{ users repository.UserRepository }
+type AuthHandler struct {
+	users  repository.UserRepository
+	tokens *auth.Tokens
+}
 
 type credentials struct {
 	Email    string `json:"email"`
@@ -100,9 +104,14 @@ func (h *AuthHandler) Login(c fiber.Ctx) error {
 	if err != nil || user.PasswordHash == "" || passwordErr != nil {
 		return c.Status(401).JSON(fiber.Map{"error": "invalid email or password"})
 	}
-	return c.JSON(fiber.Map{"message": "login successful", "user": user})
+	token, err := h.tokens.Issue(user.ID)
+	if err != nil {
+		return databaseError(c, err)
+	}
+	c.Set("Cache-Control", "no-store")
+	return c.JSON(fiber.Map{"message": "login successful", "user": user, "access_token": token, "token_type": "Bearer", "expires_in": int(auth.TokenLifetime.Seconds())})
 }
 
-func NewAuth(users repository.UserRepository) *AuthHandler {
-	return &AuthHandler{users: users}
+func NewAuth(users repository.UserRepository, tokens *auth.Tokens) *AuthHandler {
+	return &AuthHandler{users: users, tokens: tokens}
 }

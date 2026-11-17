@@ -40,7 +40,7 @@ func (r *fakeUserRepository) GetUserByEmail(_ context.Context, email string) (mo
 
 func TestRegisterAndLogin(t *testing.T) {
 	users := &fakeUserRepository{}
-	app := application.New(&fakeBookRepository{}, users)
+	app := application.New(&fakeBookRepository{}, users, testTokens())
 	var registered map[string]any
 	request(t, app, http.MethodPost, "/api/v1/auth/register", `{"name":" Alice ","email":" ALICE@example.com ","password":" secret123 "}`, 201, &registered)
 	if users.user.Email != "alice@example.com" || users.user.Name != "Alice" {
@@ -54,7 +54,17 @@ func TestRegisterAndLogin(t *testing.T) {
 		t.Fatalf("unsafe user response: %v", public)
 	}
 	request(t, app, http.MethodPost, "/api/v1/auth/register", `{"name":"Alice","email":"ALICE@example.com","password":"secret123"}`, 409, nil)
-	request(t, app, http.MethodPost, "/api/v1/auth/login", `{"email":"ALICE@example.com","password":" secret123 "}`, 200, nil)
+	var login struct {
+		AccessToken string `json:"access_token"`
+		TokenType   string `json:"token_type"`
+		ExpiresIn   int    `json:"expires_in"`
+	}
+	request(t, app, http.MethodPost, "/api/v1/auth/login", `{"email":"ALICE@example.com","password":" secret123 "}`, 200, &login)
+	id, err := testTokens().Verify(login.AccessToken)
+	if err != nil || id != 1 || login.TokenType != "Bearer" || login.ExpiresIn != 3600 {
+		t.Fatalf("invalid login token response: %+v, %v", login, err)
+	}
+	request(t, app, http.MethodPost, "/api/v1/books", `{"name":"Authorized book"}`, 201, nil, "Bearer "+login.AccessToken)
 	for _, body := range []string{
 		`{"email":"alice@example.com","password":"wrong"}`,
 		`{"email":"missing@example.com","password":" secret123 "}`,
@@ -78,7 +88,7 @@ func TestInvalidRegistration(t *testing.T) {
 		`{"name":"A","email":"a@example.com","password":"secret123"} {}`,
 	} {
 		users := &fakeUserRepository{}
-		request(t, application.New(&fakeBookRepository{}, users), http.MethodPost, "/api/v1/auth/register", body, 400, nil)
+		request(t, application.New(&fakeBookRepository{}, users, testTokens()), http.MethodPost, "/api/v1/auth/register", body, 400, nil)
 		if users.user.ID != 0 {
 			t.Fatal("invalid registration wrote a user")
 		}
@@ -87,7 +97,7 @@ func TestInvalidRegistration(t *testing.T) {
 
 func TestAuthRepositoryErrors(t *testing.T) {
 	users := &fakeUserRepository{err: context.DeadlineExceeded}
-	app := application.New(&fakeBookRepository{}, users)
+	app := application.New(&fakeBookRepository{}, users, testTokens())
 	request(t, app, http.MethodPost, "/api/v1/auth/register", `{"name":"A","email":"a@example.com","password":"secret123"}`, 500, nil)
 	request(t, app, http.MethodPost, "/api/v1/auth/login", `{"email":"a@example.com","password":"secret123"}`, 500, nil)
 }

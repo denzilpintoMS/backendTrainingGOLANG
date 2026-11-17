@@ -12,16 +12,28 @@ import (
 	"testing"
 	"time"
 
+	"task_3/internal/auth"
 	"task_3/internal/model"
 	"task_3/internal/repository"
 
 	"github.com/gofiber/fiber/v3"
 )
 
-func request(t *testing.T, app *fiber.App, method, path, body string, status int, target any) {
+func request(t *testing.T, app *fiber.App, method, path, body string, status int, target any, authorization ...string) {
 	t.Helper()
 	req := httptest.NewRequest(method, path, strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
+	if len(authorization) > 0 {
+		if authorization[0] != "" {
+			req.Header.Set("Authorization", authorization[0])
+		}
+	} else if method == http.MethodPost && path == "/api/v1/books" {
+		token, err := testTokens().Issue(1)
+		if err != nil {
+			t.Fatal(err)
+		}
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
 	// Bcrypt is deliberately expensive, especially under the race detector.
 	res, err := app.Test(req, fiber.TestConfig{Timeout: 10 * time.Second, FailOnTimeout: true})
 	if err != nil {
@@ -127,7 +139,7 @@ type fakeBookRepository struct {
 }
 
 func newTestApp() *fiber.App {
-	return application.New(&fakeBookRepository{}, &fakeUserRepository{})
+	return application.New(&fakeBookRepository{}, &fakeUserRepository{}, testTokens())
 }
 
 func (r *fakeBookRepository) Create(_ context.Context, book model.Book) (model.Book, error) {
@@ -156,7 +168,7 @@ func (r *fakeBookRepository) List(_ context.Context) ([]model.Book, error) {
 }
 
 func TestRepositoryErrors(t *testing.T) {
-	app := application.New(&fakeBookRepository{err: errors.New("private database error")}, &fakeUserRepository{})
+	app := application.New(&fakeBookRepository{err: errors.New("private database error")}, &fakeUserRepository{}, testTokens())
 	for _, tc := range []struct{ method, path, body string }{
 		{http.MethodPost, "/api/v1/books", `{"name":"Book"}`},
 		{http.MethodGet, "/api/v1/books/1", ""},
@@ -170,4 +182,12 @@ func TestRepositoryErrors(t *testing.T) {
 			}
 		})
 	}
+}
+
+func testTokens() *auth.Tokens {
+	tokens, err := auth.New("mindstack")
+	if err != nil {
+		panic(err)
+	}
+	return tokens
 }

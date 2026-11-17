@@ -70,7 +70,7 @@ func TestPostgresIntegration(t *testing.T) {
 	}
 	// Capturing the variable also closes the replacement pool after reopening.
 	defer func() { books.Close() }()
-	app := application.New(books, books)
+	app := application.New(books, books, testTokens())
 	var empty map[string]string
 	request(t, app, http.MethodGet, "/api/v1/books/all", "", http.StatusOK, &empty)
 	if empty["message"] != "no books available" {
@@ -97,7 +97,7 @@ func TestPostgresIntegration(t *testing.T) {
 		t.Fatal(err)
 	}
 	books = reopened
-	app = application.New(books, books)
+	app = application.New(books, books, testTokens())
 	var got model.Book
 	request(t, app, http.MethodGet, "/api/v1/books/1", "", http.StatusOK, &got)
 	if got != want[0] {
@@ -137,7 +137,11 @@ func TestPostgresIntegration(t *testing.T) {
 	// Exercise registration, duplicate handling, and bcrypt login through GORM.
 	request(t, app, http.MethodPost, "/api/v1/auth/register", `{"name":"Reader","email":"reader@example.com","password":"secret123"}`, http.StatusCreated, nil)
 	request(t, app, http.MethodPost, "/api/v1/auth/register", `{"name":"Reader","email":"READER@example.com","password":"secret123"}`, http.StatusConflict, nil)
-	request(t, app, http.MethodPost, "/api/v1/auth/login", `{"email":"READER@example.com","password":"secret123"}`, http.StatusOK, nil)
+	var login struct {
+		AccessToken string `json:"access_token"`
+	}
+	request(t, app, http.MethodPost, "/api/v1/auth/login", `{"email":"READER@example.com","password":"secret123"}`, http.StatusOK, &login)
+	request(t, app, http.MethodPost, "/api/v1/books", `{"name":"JWT authorized book"}`, http.StatusCreated, nil, "Bearer "+login.AccessToken)
 	request(t, app, http.MethodPost, "/api/v1/auth/login", `{"email":"reader@example.com","password":"wrong"}`, http.StatusUnauthorized, nil)
 
 	// A canceled operation must return an error rather than wait indefinitely.

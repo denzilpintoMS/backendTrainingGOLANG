@@ -9,15 +9,16 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v3"
+	"task_3/internal/auth"
 	"task_3/internal/config"
 	"task_3/internal/repository"
 	"task_3/internal/routes"
 )
 
 // New builds the HTTP application with the supplied storage dependencies.
-func New(books repository.BookRepository, users repository.UserRepository) *fiber.App {
+func New(books repository.BookRepository, users repository.UserRepository, tokens *auth.Tokens) *fiber.App {
 	app := fiber.New(fiber.Config{BodyLimit: 1 << 20})
-	routes.Register(app, books, users)
+	routes.Register(app, books, users, tokens)
 	return app
 }
 
@@ -28,6 +29,10 @@ func Run() error {
 		return err
 	}
 
+	tokens, err := auth.New(cfg.JWTSecret)
+	if err != nil {
+		return err
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	books, err := repository.NewPostgres(ctx, cfg.DatabaseURL)
 	cancel()
@@ -36,7 +41,7 @@ func Run() error {
 	}
 	defer books.Close()
 
-	app := New(books, books)
+	app := New(books, books, tokens)
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 

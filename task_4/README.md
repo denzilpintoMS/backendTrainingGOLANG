@@ -24,7 +24,7 @@ Start the server:
 go run .
 ```
 
-The app loads `.env` automatically; existing environment variables take precedence. `DATABASE_URL` is required, and `PORT` defaults to `8080`. Startup checks the connection and runs GORM AutoMigrate for User and Book. This is intended for local development; use versioned migrations before deploying. There is no in-memory fallback when PostgreSQL is unavailable.
+The app loads `.env` automatically; existing environment variables take precedence. `DATABASE_URL` and `JWT_SECRET` are required, and `PORT` defaults to `8080`. Startup checks the connection and runs GORM AutoMigrate for User and Book. This is intended for local development; use versioned migrations before deploying. There is no in-memory fallback when PostgreSQL is unavailable.
 
 Docker stores database files in a named volume, so they survive container restarts. Stop it with `docker compose down`. Local credentials in `.env` are ignored by Git; `.env.example` is safe to commit.
 
@@ -32,12 +32,13 @@ Docker stores database files in a named volume, so they survive container restar
 
 | Method | Route | Behavior |
 | --- | --- | --- |
-| POST | `/api/v1/books` | Create a book; returns 201 |
+| POST | `/api/v1/books` | Create a book with a bearer JWT; returns 201 |
 | GET | `/api/v1/books/all` | List books ordered by ID |
 | GET | `/api/v1/books/:id` | Get a book; returns 404 if missing |
 
 ```sh
 curl -X POST http://localhost:8080/api/v1/books \
+  -H "Authorization: Bearer $TOKEN" \
   -H 'Content-Type: application/json' \
   -d '{"name":"The Go Programming Language","author":"Alan Donovan and Brian Kernighan","desc":"A Go reference"}'
 
@@ -57,6 +58,10 @@ internal/
     app_test.go                 # Book API tests and test helpers
     auth_test.go                # Registration/login tests
     postgres_integration_test.go
+  auth/
+    jwt.go                      # Signs and validates one-hour access tokens
+  middleware/
+    jwt.go                      # Requires a bearer token for protected routes
   config/
     config.go                   # Loads .env and environment configuration
   routes/
@@ -97,18 +102,18 @@ The integration test creates and removes a unique test schema. The test user nee
 
 `Book` has ID, name, author, description, and creation/update timestamps. The existing book JSON response is unchanged; timestamps remain internal. `User` has ID, name, email, and creation/update timestamps. Both models reject blank names at the database level, and user emails must be nonblank and unique without regard to letter case.
 
-Users and books are independent until the app's ownership or borrowing workflow is defined. Registration and credential verification are available through the auth endpoints below. Login returns the user and a success message; persistent sessions, tokens, and protected book routes can be added next.
+Users and books are independent until the app's ownership or borrowing workflow is defined. Registration and credential verification are available through the auth endpoints below. Login returns the user and a signed JWT. Book reads are public; book creation requires the bearer token.
 
 Potential next steps:
 
-- Add sessions or tokens and protect routes when the authorization workflow is defined.
+- Add refresh tokens or logout/revocation if required by the login workflow.
 - For a lending app, add BookCopy and Loan models to track physical copies, borrowers, due dates, and returns.
 - Add pagination for lists and versioned migrations before deployment.
 
 ## Registration and login
 
 - `POST /api/v1/auth/register`: accepts `name`, `email`, and `password`; returns 201 with the public user, or 409 for an existing email.
-- `POST /api/v1/auth/login`: accepts `email` and `password`; returns 200 with the public user, or 401 for invalid credentials. It verifies credentials without creating a session or issuing a token.
+- `POST /api/v1/auth/login`: accepts `email` and `password`; returns 200 with the public user, or 401 for invalid credentials. Successful login includes `access_token`, `token_type` (`Bearer`), and `expires_in` (3600 seconds).
 
 Emails are trimmed and normalized to lowercase. Registration requires a nonblank name, a valid email, and a password of at least 8 characters and at most 72 bytes. Passwords are preserved exactly, hashed using bcrypt at its default cost, and excluded from JSON responses. Existing users without a password hash cannot log in.
 
@@ -121,3 +126,15 @@ curl -X POST http://localhost:8080/api/v1/auth/login \
   -H 'Content-Type: application/json' \
   -d '{"email":"alice@example.com","password":"secret123"}'
 ```
+
+## JWT authorization
+
+The local `.env` and `.env.example` configure `JWT_SECRET=mindstack`. Tokens are signed with HS256 and contain the user ID (`sub`), issuer, issue time, and a one-hour expiry. Verification checks the signing algorithm, signature, issuer, expiry, and a positive user ID. Missing or invalid tokens on protected routes return 401.
+
+Registration and login are public. `GET /api/v1/books/all` and `GET /api/v1/books/:id` are public. `POST /api/v1/books` requires `Authorization: Bearer <access_token>`. Set `TOKEN` to the `access_token` from the login response before running the book creation example:
+
+```sh
+export TOKEN='paste-the-access-token-from-login'
+```
+
+Only login issues tokens. Registration returns the public user without a token. The middleware makes the authenticated ID available as `c.Locals("user_id")`.

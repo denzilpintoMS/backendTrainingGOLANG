@@ -2,16 +2,23 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"errors"
 	"io"
+	"log"
 	"strconv"
 	"strings"
+	"time"
+
+	"task_3/internal/model"
+	"task_3/internal/repository"
 
 	"github.com/gofiber/fiber/v3"
 )
 
 type bookHandler struct {
-	store *bookStore
+	books repository.BookRepository
 }
 
 func (h *bookHandler) createBook(c fiber.Ctx) error {
@@ -34,11 +41,16 @@ func (h *bookHandler) createBook(c fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "name is required"})
 	}
 
-	book := h.store.create(Book{
+	ctx, cancel := context.WithTimeout(c.Context(), 5*time.Second)
+	defer cancel()
+	book, err := h.books.Create(ctx, model.Book{
 		Name:        input.Name,
 		Author:      strings.TrimSpace(input.Author),
 		Description: input.Description,
 	})
+	if err != nil {
+		return databaseError(c, err)
+	}
 	return c.Status(fiber.StatusCreated).JSON(book)
 }
 
@@ -48,17 +60,32 @@ func (h *bookHandler) getBookByID(c fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "id must be a positive integer"})
 	}
 
-	book, ok := h.store.get(id)
-	if !ok {
+	ctx, cancel := context.WithTimeout(c.Context(), 5*time.Second)
+	defer cancel()
+	book, err := h.books.GetByID(ctx, id)
+	if errors.Is(err, repository.ErrBookNotFound) {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "book not found"})
+	}
+	if err != nil {
+		return databaseError(c, err)
 	}
 	return c.JSON(book)
 }
 
 func (h *bookHandler) listBooks(c fiber.Ctx) error {
-	books := h.store.list()
+	ctx, cancel := context.WithTimeout(c.Context(), 5*time.Second)
+	defer cancel()
+	books, err := h.books.List(ctx)
+	if err != nil {
+		return databaseError(c, err)
+	}
 	if len(books) == 0 {
 		return c.JSON(fiber.Map{"message": "no books available"})
 	}
 	return c.JSON(books)
+}
+
+func databaseError(c fiber.Ctx, err error) error {
+	log.Printf("book repository: %v", err)
+	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "internal server error"})
 }

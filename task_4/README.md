@@ -49,12 +49,33 @@ curl http://localhost:8080/api/v1/books/1
 
 ## Code layout
 
-- `main.go`: environment loading, startup, route wiring, and shutdown.
-- `handlers.go`: HTTP validation and responses through `BookRepository`.
-- `internal/model/book.go`: book fields, primary key, and timestamps.
-- `internal/model/user.go`: user name, case-insensitive unique email, primary key, and timestamps.
-- `internal/repository/book.go`: repository interface and not-found error.
-- `internal/repository/postgres.go`: GORM setup, PostgreSQL connection pool, AutoMigrate, and book queries.
+```text
+main.go                         # Entry point; calls app.Run
+internal/
+  app/
+    app.go                      # Builds Fiber app; manages startup/shutdown
+    app_test.go                 # Book API tests and test helpers
+    auth_test.go                # Registration/login tests
+    postgres_integration_test.go
+  config/
+    config.go                   # Loads .env and environment configuration
+  routes/
+    routes.go                   # Registers all /api/v1 endpoints
+  handler/
+    book.go                     # Book HTTP handlers and validation
+    auth.go                     # Auth HTTP handlers and bcrypt checks
+    errors.go                   # Shared HTTP error responses
+  model/
+    book.go                     # GORM Book model
+    user.go                     # GORM User model
+  repository/
+    connection.go               # PostgreSQL/GORM connection setup
+    postgres.go                 # AutoMigrate and book persistence
+    book.go                     # BookRepository interface
+    user.go                     # UserRepository interface and persistence
+```
+
+Requests flow from routes to handlers to repositories. Handlers depend on repository interfaces, and database queries stay in the repository package. `app.New` accepts repositories so API tests can supply fakes. Run `go run .` from the project root so configuration loads the local `.env` file.
 
 ## Checks
 

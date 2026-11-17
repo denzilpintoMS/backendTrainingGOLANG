@@ -1,4 +1,4 @@
-package main
+package app_test
 
 import (
 	"context"
@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"reflect"
 	"strings"
+	application "task_3/internal/app"
 	"testing"
 	"time"
 
@@ -126,7 +127,7 @@ type fakeBookRepository struct {
 }
 
 func newTestApp() *fiber.App {
-	return newApp(&fakeBookRepository{}, &fakeUserRepository{})
+	return application.New(&fakeBookRepository{}, &fakeUserRepository{})
 }
 
 func (r *fakeBookRepository) Create(_ context.Context, book model.Book) (model.Book, error) {
@@ -155,7 +156,7 @@ func (r *fakeBookRepository) List(_ context.Context) ([]model.Book, error) {
 }
 
 func TestRepositoryErrors(t *testing.T) {
-	app := newApp(&fakeBookRepository{err: errors.New("private database error")}, &fakeUserRepository{})
+	app := application.New(&fakeBookRepository{err: errors.New("private database error")}, &fakeUserRepository{})
 	for _, tc := range []struct{ method, path, body string }{
 		{http.MethodPost, "/api/v1/books", `{"name":"Book"}`},
 		{http.MethodGet, "/api/v1/books/1", ""},

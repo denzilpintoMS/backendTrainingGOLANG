@@ -1,4 +1,4 @@
-package main
+package handler
 
 import (
 	"bytes"
@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
-	"log"
 	"strconv"
 	"strings"
 	"time"
@@ -17,11 +16,11 @@ import (
 	"github.com/gofiber/fiber/v3"
 )
 
-type bookHandler struct {
+type BookHandler struct {
 	books repository.BookRepository
 }
 
-func (h *bookHandler) createBook(c fiber.Ctx) error {
+func (h *BookHandler) Create(c fiber.Ctx) error {
 	var input struct {
 		Name        string `json:"name"`
 		Author      string `json:"author"`
@@ -54,7 +53,7 @@ func (h *bookHandler) createBook(c fiber.Ctx) error {
 	return c.Status(fiber.StatusCreated).JSON(book)
 }
 
-func (h *bookHandler) getBookByID(c fiber.Ctx) error {
+func (h *BookHandler) GetByID(c fiber.Ctx) error {
 	id, err := strconv.Atoi(c.Params("id"))
 	if err != nil || id <= 0 {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "id must be a positive integer"})
@@ -72,7 +71,7 @@ func (h *bookHandler) getBookByID(c fiber.Ctx) error {
 	return c.JSON(book)
 }
 
-func (h *bookHandler) listBooks(c fiber.Ctx) error {
+func (h *BookHandler) List(c fiber.Ctx) error {
 	ctx, cancel := context.WithTimeout(c.Context(), 5*time.Second)
 	defer cancel()
 	books, err := h.books.List(ctx)
@@ -85,7 +84,6 @@ func (h *bookHandler) listBooks(c fiber.Ctx) error {
 	return c.JSON(books)
 }
 
-func databaseError(c fiber.Ctx, err error) error {
-	log.Printf("book repository: %v", err)
-	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "internal server error"})
+func NewBook(books repository.BookRepository) *BookHandler {
+	return &BookHandler{books: books}
 }

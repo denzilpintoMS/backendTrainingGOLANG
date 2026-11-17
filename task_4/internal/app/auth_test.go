@@ -1,9 +1,10 @@
-package main
+package app_test
 
 import (
 	"context"
 	"net/http"
 	"strings"
+	application "task_3/internal/app"
 	"testing"
 
 	"golang.org/x/crypto/bcrypt"
@@ -39,7 +40,7 @@ func (r *fakeUserRepository) GetUserByEmail(_ context.Context, email string) (mo
 
 func TestRegisterAndLogin(t *testing.T) {
 	users := &fakeUserRepository{}
-	app := newApp(&fakeBookRepository{}, users)
+	app := application.New(&fakeBookRepository{}, users)
 	var registered map[string]any
 	request(t, app, http.MethodPost, "/api/v1/auth/register", `{"name":" Alice ","email":" ALICE@example.com ","password":" secret123 "}`, 201, &registered)
 	if users.user.Email != "alice@example.com" || users.user.Name != "Alice" {
@@ -77,7 +78,7 @@ func TestInvalidRegistration(t *testing.T) {
 		`{"name":"A","email":"a@example.com","password":"secret123"} {}`,
 	} {
 		users := &fakeUserRepository{}
-		request(t, newApp(&fakeBookRepository{}, users), http.MethodPost, "/api/v1/auth/register", body, 400, nil)
+		request(t, application.New(&fakeBookRepository{}, users), http.MethodPost, "/api/v1/auth/register", body, 400, nil)
 		if users.user.ID != 0 {
 			t.Fatal("invalid registration wrote a user")
 		}
@@ -86,7 +87,7 @@ func TestInvalidRegistration(t *testing.T) {
 
 func TestAuthRepositoryErrors(t *testing.T) {
 	users := &fakeUserRepository{err: context.DeadlineExceeded}
-	app := newApp(&fakeBookRepository{}, users)
+	app := application.New(&fakeBookRepository{}, users)
 	request(t, app, http.MethodPost, "/api/v1/auth/register", `{"name":"A","email":"a@example.com","password":"secret123"}`, 500, nil)
 	request(t, app, http.MethodPost, "/api/v1/auth/login", `{"email":"a@example.com","password":"secret123"}`, 500, nil)
 }

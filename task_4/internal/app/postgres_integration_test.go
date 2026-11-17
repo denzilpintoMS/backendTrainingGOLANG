@@ -1,4 +1,4 @@
-package main
+package app_test
 
 import (
 	"context"
@@ -8,6 +8,7 @@ import (
 	"os"
 	"reflect"
 	"strconv"
+	application "task_3/internal/app"
 	"testing"
 	"time"
 
@@ -69,7 +70,7 @@ func TestPostgresIntegration(t *testing.T) {
 	}
 	// Capturing the variable also closes the replacement pool after reopening.
 	defer func() { books.Close() }()
-	app := newApp(books, books)
+	app := application.New(books, books)
 	var empty map[string]string
 	request(t, app, http.MethodGet, "/api/v1/books/all", "", http.StatusOK, &empty)
 	if empty["message"] != "no books available" {
@@ -96,7 +97,7 @@ func TestPostgresIntegration(t *testing.T) {
 		t.Fatal(err)
 	}
 	books = reopened
-	app = newApp(books, books)
+	app = application.New(books, books)
 	var got model.Book
 	request(t, app, http.MethodGet, "/api/v1/books/1", "", http.StatusOK, &got)
 	if got != want[0] {

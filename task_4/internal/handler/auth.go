@@ -1,4 +1,4 @@
-package main
+package handler
 
 import (
 	"bytes"
@@ -17,7 +17,7 @@ import (
 	"task_3/internal/repository"
 )
 
-type authHandler struct{ users repository.UserRepository }
+type AuthHandler struct{ users repository.UserRepository }
 
 type credentials struct {
 	Email    string `json:"email"`
@@ -42,7 +42,7 @@ func normalizeEmail(email string) (string, bool) {
 	return email, err == nil && parsed.Address == email && len(email) <= 254
 }
 
-func (h *authHandler) register(c fiber.Ctx) error {
+func (h *AuthHandler) Register(c fiber.Ctx) error {
 	var input struct {
 		Name     string `json:"name"`
 		Email    string `json:"email"`
@@ -76,7 +76,7 @@ func (h *authHandler) register(c fiber.Ctx) error {
 	return c.Status(201).JSON(fiber.Map{"user": user})
 }
 
-func (h *authHandler) login(c fiber.Ctx) error {
+func (h *AuthHandler) Login(c fiber.Ctx) error {
 	var input credentials
 	if err := decodeAuthBody(c, &input); err != nil {
 		return c.Status(400).JSON(fiber.Map{"error": "invalid JSON body"})
@@ -101,4 +101,8 @@ func (h *authHandler) login(c fiber.Ctx) error {
 		return c.Status(401).JSON(fiber.Map{"error": "invalid email or password"})
 	}
 	return c.JSON(fiber.Map{"message": "login successful", "user": user})
+}
+
+func NewAuth(users repository.UserRepository) *AuthHandler {
+	return &AuthHandler{users: users}
 }

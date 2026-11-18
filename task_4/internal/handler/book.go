@@ -1,17 +1,13 @@
 package handler
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
-	"io"
-	"strconv"
-	"strings"
 	"time"
 
 	"task_3/internal/model"
 	"task_3/internal/repository"
+	"task_3/internal/request"
 
 	"github.com/gofiber/fiber/v3"
 )
@@ -21,30 +17,16 @@ type BookHandler struct {
 }
 
 func (h *BookHandler) Create(c fiber.Ctx) error {
-	var input struct {
-		Name        string `json:"name"`
-		Author      string `json:"author"`
-		Description string `json:"desc"`
-	}
-	decoder := json.NewDecoder(bytes.NewReader(c.Body()))
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&input); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid JSON body"})
-	}
-	// Require exactly one JSON value in the request body.
-	if err := decoder.Decode(new(any)); err != io.EOF {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid JSON body"})
-	}
-	input.Name = strings.TrimSpace(input.Name)
-	if input.Name == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "name is required"})
+	var input request.CreateBook
+	if err := request.Decode(c.Body(), &input); err != nil {
+		return request.Error(c, err)
 	}
 
 	ctx, cancel := context.WithTimeout(c.Context(), 5*time.Second)
 	defer cancel()
 	book, err := h.books.Create(ctx, model.Book{
 		Name:        input.Name,
-		Author:      strings.TrimSpace(input.Author),
+		Author:      input.Author,
 		Description: input.Description,
 	})
 	if err != nil {
@@ -54,8 +36,8 @@ func (h *BookHandler) Create(c fiber.Ctx) error {
 }
 
 func (h *BookHandler) GetByID(c fiber.Ctx) error {
-	id, err := strconv.Atoi(c.Params("id"))
-	if err != nil || id <= 0 {
+	id, err := request.PositiveID(c.Params("id"))
+	if err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "id must be a positive integer"})
 	}
 

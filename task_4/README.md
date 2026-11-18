@@ -138,3 +138,13 @@ export TOKEN='paste-the-access-token-from-login'
 ```
 
 Only login issues tokens. Registration returns the public user without a token. The middleware makes the authenticated ID available as `c.Locals("user_id")`.
+
+Request validation uses `github.com/go-playground/validator/v10`. Define request
+structs and their `validate` tags in `internal/request/types.go`, then call
+`request.Decode(c.Body(), &input)` in the handler and pass errors to
+`request.Error(c, err)`. The shared decoder rejects unknown fields and multiple
+JSON values, normalizes supported request types, and validates their tags.
+Optional `normalize()` methods trim names and normalize email addresses before
+validation; passwords are preserved exactly. Custom `request_email` and
+`maxbytes` tags preserve mailbox validation and bcrypt's 72-byte password limit.
+Validation failures return HTTP 400 with an `error` string naming the fields.

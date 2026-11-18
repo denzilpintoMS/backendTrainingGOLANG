@@ -75,16 +75,41 @@ curl -X POST http://localhost:3000/api/v1/auth/login \
 
 Login returns an `access_token`, `token_type` (`Bearer`), `expires_in` (3600 seconds), and user details without the password. Invalid credentials return HTTP 401; invalid input returns HTTP 400. The signed JWT contains the user ID in `sub` and expires after one hour.
 
-`JWT_SECRET` must be configured in `.env` or the environment and contain at least 32 bytes. The existing account endpoint is still public; JWT middleware is available but has not yet been attached to account routes.
+`JWT_SECRET` must be configured in `.env` or the environment and contain at least 32 bytes. The existing account endpoint is still public; The deposit endpoint uses JWT middleware. The account information endpoint is still public.
 
 ## JWT middleware
 
 `internal/middleware.JWT(jwtSecret)` validates `Authorization: Bearer <access_token>` headers. It verifies the HS256 signature, issuer, expiration, and user ID, returning HTTP 401 for invalid tokens. Handlers can read the verified user ID as `c.Locals("user_id").(uint)`.
 
-The middleware is available but has not been attached to existing routes. To protect a route later:
+The deposit endpoint uses this middleware. To protect another route later:
 
 ```go
 app.Get("/api/v1/accounts/:id", middleware.JWT(jwtSecret), handlers.AccountInfo(db))
 ```
 
 Authentication identifies the user. Account ownership must also be checked separately when protecting account handlers.
+
+## Deposit
+
+Log in, then use the returned `access_token`:
+
+```sh
+curl -X POST http://localhost:3000/api/v1/accounts/deposit \
+  -H 'Authorization: Bearer <access_token>' \
+  -H 'Content-Type: application/json' \
+  -d '{"amount":10050}'
+```
+
+Amounts are integer paise: `10050` adds ₹100.50. The account is selected from the authenticated user ID; the request does not choose an account. The account must be active.
+
+A successful deposit returns HTTP 201 with `account_id`, the updated `balance`, and the deposit `transaction`. The balance update and history record commit together, with a row lock to serialize simultaneous deposits. Failed operations roll back both changes.
+
+Invalid amounts return HTTP 400, missing/invalid tokens return 401, missing accounts return 404, inactive accounts return 409, and database errors return 500. This training endpoint simulates adding funds.
+
+Deposit integration tests use a temporary PostgreSQL schema that is removed afterwards:
+
+```sh
+TEST_DATABASE_URL="$DATABASE_URL" go test ./internal/handlers -run TestDeposit -count=1
+```
+
+Set `TEST_DATABASE_URL` to your local PostgreSQL URL; the test database user needs permission to create schemas. These tests are skipped when it is unset.

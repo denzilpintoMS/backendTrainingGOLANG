@@ -2,6 +2,7 @@ package routes
 
 import (
 	"bank/internal/handlers"
+	"bank/internal/middleware"
 	"github.com/gofiber/fiber/v3"
 	"gorm.io/gorm"
 )
@@ -14,4 +15,5 @@ func Register(app *fiber.App, db *gorm.DB, jwtSecret string) {
 	app.Post("/api/v1/auth/register", handlers.Register(db))
 	app.Post("/api/v1/auth/login", handlers.Login(db, jwtSecret))
 	app.Get("/api/v1/accounts/:id", handlers.AccountInfo(db))
+	app.Post("/api/v1/accounts/deposit", middleware.JWT(jwtSecret), handlers.Deposit(db))
 }

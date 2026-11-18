@@ -35,7 +35,7 @@ func main() {
 	})
 	app.Use(recover.New())
 	app.Use(logger.New())
-	routes.Register(app, db)
+	routes.Register(app, db, cfg.JWTSecret)
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
 	defer signal.Stop(stop)

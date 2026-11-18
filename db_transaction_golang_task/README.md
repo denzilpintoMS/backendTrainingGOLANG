@@ -21,6 +21,7 @@ Use the Go version in `go.mod` and Docker Compose.
 
 ```sh
 cp .env.example .env
+# Set JWT_SECRET in .env to a random value of at least 32 bytes.
 docker compose up -d --wait
 go run ./cmd/api
 ```
@@ -63,3 +64,15 @@ curl -X POST http://localhost:3000/api/v1/auth/register \
 ```
 
 Registration returns HTTP 201 with the user and a new active account with zero balance. Passwords are hashed with bcrypt and excluded from responses. User and account creation happen in one database transaction. Emails are stored in lowercase; duplicates return HTTP 409. Invalid input returns HTTP 400. Passwords must contain at least 8 characters and at most 72 bytes.
+
+## Login
+
+```sh
+curl -X POST http://localhost:3000/api/v1/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"alex@example.com","password":"example-password"}'
+```
+
+Login returns an `access_token`, `token_type` (`Bearer`), `expires_in` (3600 seconds), and user details without the password. Invalid credentials return HTTP 401; invalid input returns HTTP 400. The signed JWT contains the user ID in `sub` and expires after one hour.
+
+`JWT_SECRET` must be configured in `.env` or the environment and contain at least 32 bytes. The existing account endpoint is still public; JWT verification middleware will be added before implementing authenticated deposits and withdrawals.

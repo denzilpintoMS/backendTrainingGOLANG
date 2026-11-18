@@ -4,6 +4,7 @@ import (
 	"bank/internal/config"
 	"bank/internal/database"
 	"bank/internal/routes"
+	"bank/internal/validator"
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/logger"
 	"github.com/gofiber/fiber/v3/middleware/recover"
@@ -28,7 +29,10 @@ func main() {
 		log.Fatal(err)
 	}
 	defer sqlDB.Close()
-	app := fiber.New(fiber.Config{AppName: "Bank API"})
+	app := fiber.New(fiber.Config{
+		AppName:         "Bank API",
+		StructValidator: validator.New(),
+	})
 	app.Use(recover.New())
 	app.Use(logger.New())
 	routes.Register(app, db)

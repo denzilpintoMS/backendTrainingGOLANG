@@ -17,7 +17,7 @@ func Load() (Config, error) {
 	}
 	return Config{
 		Port:        env("PORT", "3000"),
-		DatabaseURL: env("DATABASE_URL", "postgres://postgres:postgres@localhost:5432/bank_db?sslmode=disable"),
+		DatabaseURL: env("DATABASE_URL", "postgres://postgres:postgres@localhost:15432/bank_db?sslmode=disable"),
 	}, nil
 }
 

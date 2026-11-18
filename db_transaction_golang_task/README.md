@@ -25,14 +25,14 @@ docker compose up -d --wait
 go run ./cmd/api
 ```
 
-Compose creates `bank_db` on first startup. If PostgreSQL already runs locally, create `bank_db` there and update `DATABASE_URL` instead of starting Compose. Environment variables take precedence over `.env`.
+Compose creates `bank_db` on first startup and exposes PostgreSQL at `localhost:15432` (port `5432` inside the container). If PostgreSQL already runs locally, create `bank_db` there and update `DATABASE_URL` instead of starting Compose. Environment variables take precedence over `.env`.
 
 ```sh
 curl http://localhost:3000/
 curl http://localhost:3000/api/v1/health
 ```
 
-The health endpoint checks the database and returns HTTP 503 when unavailable. Startup requires a working database connection. Add models and explicit migrations when introducing application tables.
+The health endpoint checks the database and returns HTTP 503 when unavailable. Startup requires a working database connection. Startup runs GORM AutoMigrate for the User and Account models before accepting requests. Migration errors prevent the server from starting.
 
 ```sh
 go test ./...
@@ -52,4 +52,4 @@ curl http://localhost:3000/api/v1/accounts/1
 
 `GET /api/v1/accounts/:id` returns the account ID, user ID, account number, balance in paise, status, creation time, and deletion time. It returns HTTP 400 for invalid IDs, 404 for missing or soft-deleted accounts, and 500 for database errors.
 
-The endpoint requires the account table and existing account records; schema migrations and account creation are not yet implemented. Authentication and account ownership checks are not yet implemented, so this development endpoint accepts any account ID.
+The account table is created automatically at startup; account creation is not yet implemented, so testing this endpoint requires existing account records. Authentication and account ownership checks are not yet implemented, so this development endpoint accepts any account ID.

@@ -1,6 +1,8 @@
 package database
 
 import (
+	"bank/internal/models"
+
 	"context"
 	"fmt"
 	"gorm.io/driver/postgres"
@@ -25,6 +27,10 @@ func Connect(dsn string) (*gorm.DB, error) {
 	if err := sqlDB.PingContext(ctx); err != nil {
 		sqlDB.Close()
 		return nil, fmt.Errorf("connect to postgres: %w", err)
+	}
+	if err := db.AutoMigrate(&models.User{}, &models.Account{}); err != nil {
+		sqlDB.Close()
+		return nil, fmt.Errorf("migrate database models: %w", err)
 	}
 	return db, nil
 }

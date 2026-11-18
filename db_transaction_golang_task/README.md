@@ -43,3 +43,13 @@ docker compose down
 The Compose credentials are local development defaults. Configure credentials and SSL in `DATABASE_URL` for other environments.
 
 References: [Fiber](https://docs.gofiber.io/), [GORM PostgreSQL setup](https://gorm.io/docs/connecting_to_the_database.html).
+
+## Account information
+
+```sh
+curl http://localhost:3000/api/v1/accounts/1
+```
+
+`GET /api/v1/accounts/:id` returns the account ID, user ID, account number, balance in paise, status, creation time, and deletion time. It returns HTTP 400 for invalid IDs, 404 for missing or soft-deleted accounts, and 500 for database errors.
+
+The endpoint requires the account table and existing account records; schema migrations and account creation are not yet implemented. Authentication and account ownership checks are not yet implemented, so this development endpoint accepts any account ID.

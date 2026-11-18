@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v3"
+	"github.com/gofiber/fiber/v3/middleware/logger"
 	"task_3/internal/auth"
 	"task_3/internal/config"
 	"task_3/internal/repository"
@@ -18,6 +19,7 @@ import (
 // New builds the HTTP application with the supplied storage dependencies.
 func New(books repository.BookRepository, users repository.UserRepository, tokens *auth.Tokens) *fiber.App {
 	app := fiber.New(fiber.Config{BodyLimit: 1 << 20})
+	app.Use(logger.New())
 	routes.Register(app, books, users, tokens)
 	return app
 }

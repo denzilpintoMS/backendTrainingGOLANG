@@ -11,7 +11,7 @@ import (
 )
 
 func Connect(dsn string) (*gorm.DB, error) {
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{DisableAutomaticPing: true})
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{DisableAutomaticPing: true, TranslateError: true})
 	if err != nil {
 		return nil, fmt.Errorf("open postgres: %w", err)
 	}

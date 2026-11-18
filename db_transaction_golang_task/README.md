@@ -52,4 +52,14 @@ curl http://localhost:3000/api/v1/accounts/1
 
 `GET /api/v1/accounts/:id` returns the account ID, user ID, account number, balance in paise, status, creation time, and deletion time. It returns HTTP 400 for invalid IDs, 404 for missing or soft-deleted accounts, and 500 for database errors.
 
-The account table is created automatically at startup; account creation is not yet implemented, so testing this endpoint requires existing account records. Authentication and account ownership checks are not yet implemented, so this development endpoint accepts any account ID.
+The account table is created automatically at startup. Register a user to create an account. Authentication and account ownership checks are not yet implemented, so this development endpoint accepts any account ID.
+
+## Registration
+
+```sh
+curl -X POST http://localhost:3000/api/v1/auth/register \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"Alex","email":"alex@example.com","password":"example-password"}'
+```
+
+Registration returns HTTP 201 with the user and a new active account with zero balance. Passwords are hashed with bcrypt and excluded from responses. User and account creation happen in one database transaction. Emails are stored in lowercase; duplicates return HTTP 409. Invalid input returns HTTP 400. Passwords must contain at least 8 characters and at most 72 bytes.

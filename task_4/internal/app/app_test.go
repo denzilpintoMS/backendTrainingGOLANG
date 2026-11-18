@@ -163,8 +163,20 @@ func (r *fakeBookRepository) GetByID(_ context.Context, id int) (model.Book, err
 	return model.Book{}, repository.ErrBookNotFound
 }
 
-func (r *fakeBookRepository) List(_ context.Context) ([]model.Book, error) {
-	return r.books, r.err
+func (r *fakeBookRepository) List(_ context.Context, startID, limit int) ([]model.Book, error) {
+	if r.err != nil {
+		return nil, r.err
+	}
+	books := make([]model.Book, 0)
+	for _, book := range r.books {
+		if book.ID >= startID {
+			books = append(books, book)
+			if len(books) == limit {
+				break
+			}
+		}
+	}
+	return books, nil
 }
 
 func TestRepositoryErrors(t *testing.T) {
@@ -190,4 +202,45 @@ func testTokens() *auth.Tokens {
 		panic(err)
 	}
 	return tokens
+}
+
+func TestBookPagination(t *testing.T) {
+	repo := &fakeBookRepository{}
+	for _, id := range []int{1, 3, 4, 7, 9, 10, 12, 15, 18, 20, 22, 25} {
+		repo.books = append(repo.books, model.Book{ID: id, Name: "Sample"})
+	}
+	app := application.New(repo, &fakeUserRepository{}, testTokens())
+	for _, tc := range []struct {
+		query string
+		want  []model.Book
+	}{
+		{"", repo.books[:10]},
+		{"?start_id=1&limit=10", repo.books[:10]},
+		{"?start_id=5&limit=2", repo.books[3:5]},
+		{"?start_id=21", repo.books[10:]},
+		{"?limit=1", repo.books[:1]},
+		{"?limit=100", repo.books},
+	} {
+		t.Run(tc.query, func(t *testing.T) {
+			var got []model.Book
+			request(t, app, http.MethodGet, "/api/v1/books/all"+tc.query, "", 200, &got)
+			if !reflect.DeepEqual(got, tc.want) {
+				t.Fatalf("got %+v, want %+v", got, tc.want)
+			}
+		})
+	}
+	var empty map[string]string
+	request(t, app, http.MethodGet, "/api/v1/books/all?start_id=26", "", 200, &empty)
+	if empty["message"] != "no books available" {
+		t.Fatalf("unexpected empty response: %v", empty)
+	}
+	for _, query := range []string{
+		"?start_id=0", "?start_id=-1", "?start_id=abc", "?start_id=1.5",
+		"?start_id=9999999999999999999999999999999",
+		"?limit=0", "?limit=-1", "?limit=101", "?limit=abc", "?limit=2.5",
+	} {
+		t.Run(query, func(t *testing.T) {
+			request(t, app, http.MethodGet, "/api/v1/books/all"+query, "", 400, nil)
+		})
+	}
 }

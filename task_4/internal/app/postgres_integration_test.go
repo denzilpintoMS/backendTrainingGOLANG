@@ -108,6 +108,14 @@ func TestPostgresIntegration(t *testing.T) {
 	if !reflect.DeepEqual(list, want) {
 		t.Fatalf("got %v, want %v", list, want)
 	}
+	request(t, app, http.MethodGet, "/api/v1/books/all?start_id=1&limit=1", "", http.StatusOK, &list)
+	if !reflect.DeepEqual(list, want[:1]) {
+		t.Fatalf("first page: got %v, want %v", list, want[:1])
+	}
+	request(t, app, http.MethodGet, "/api/v1/books/all?start_id=2&limit=1", "", http.StatusOK, &list)
+	if !reflect.DeepEqual(list, want[1:]) {
+		t.Fatalf("second page: got %v, want %v", list, want[1:])
+	}
 	stored, err := books.GetByID(ctx, 1)
 	if err != nil {
 		t.Fatal(err)
@@ -147,7 +155,7 @@ func TestPostgresIntegration(t *testing.T) {
 	// A canceled operation must return an error rather than wait indefinitely.
 	canceledCtx, cancelOperation := context.WithCancel(context.Background())
 	cancelOperation()
-	if _, err := books.List(canceledCtx); !errors.Is(err, context.Canceled) {
+	if _, err := books.List(canceledCtx, 1, 10); !errors.Is(err, context.Canceled) {
 		t.Fatalf("expected context cancellation, got %v", err)
 	}
 }

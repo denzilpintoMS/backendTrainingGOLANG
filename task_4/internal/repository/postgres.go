@@ -57,9 +57,9 @@ func (r *Postgres) GetByID(ctx context.Context, id int) (model.Book, error) {
 	return book, nil
 }
 
-func (r *Postgres) List(ctx context.Context) ([]model.Book, error) {
+func (r *Postgres) List(ctx context.Context, startID, limit int) ([]model.Book, error) {
 	books := make([]model.Book, 0)
-	if err := r.db.WithContext(ctx).Order("id ASC").Find(&books).Error; err != nil {
+	if err := r.db.WithContext(ctx).Where("id >= ?", startID).Order("id ASC").Limit(limit).Find(&books).Error; err != nil {
 		return nil, fmt.Errorf("list books: %w", err)
 	}
 	return books, nil

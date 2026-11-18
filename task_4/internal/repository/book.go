@@ -13,5 +13,5 @@ var ErrBookNotFound = errors.New("book not found")
 type BookRepository interface {
 	Create(ctx context.Context, book model.Book) (model.Book, error)
 	GetByID(ctx context.Context, id int) (model.Book, error)
-	List(ctx context.Context) ([]model.Book, error)
+	List(ctx context.Context, startID, limit int) ([]model.Book, error)
 }

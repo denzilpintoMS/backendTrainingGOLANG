@@ -32,3 +32,9 @@ func (r *CreateBook) normalize() {
 	r.Name = strings.TrimSpace(r.Name)
 	r.Author = strings.TrimSpace(r.Author)
 }
+
+// ListBooks uses an inclusive starting ID and a bounded page size.
+type ListBooks struct {
+	StartID int `query:"start_id" json:"start_id" validate:"gt=0"`
+	Limit   int `query:"limit" json:"limit" validate:"gt=0,lte=100"`
+}

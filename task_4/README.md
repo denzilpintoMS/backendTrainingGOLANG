@@ -33,7 +33,7 @@ Docker stores database files in a named volume, so they survive container restar
 | Method | Route | Behavior |
 | --- | --- | --- |
 | POST | `/api/v1/books` | Create a book with a bearer JWT; returns 201 |
-| GET | `/api/v1/books/all` | List books ordered by ID |
+| GET | `/api/v1/books/all` | List books ordered by ID; defaults to 10 books starting at ID 1 |
 | GET | `/api/v1/books/:id` | Get a book; returns 404 if missing |
 
 ```sh
@@ -148,3 +148,9 @@ Optional `normalize()` methods trim names and normalize email addresses before
 validation; passwords are preserved exactly. Custom `request_email` and
 `maxbytes` tags preserve mailbox validation and bcrypt's 72-byte password limit.
 Validation failures return HTTP 400 with an `error` string naming the fields.
+
+Book list pagination: `GET /api/v1/books/all?start_id=1&limit=10`.
+`start_id` is inclusive and defaults to 1; `limit` defaults to 10 and accepts
+1–100. For the next page, use the last returned book ID plus one as `start_id`.
+The response remains an array of books, or the existing no-books message when
+there are no matches. Invalid query values return HTTP 400.

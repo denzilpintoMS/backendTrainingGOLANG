@@ -18,6 +18,7 @@ import (
 
 var validate = newValidator()
 var errJSON = errors.New("invalid JSON body")
+var errQuery = errors.New("invalid query parameters")
 
 func newValidator() *validator.Validate {
 	v := validator.New(validator.WithRequiredStructEnabled())
@@ -62,6 +63,14 @@ func Decode(body []byte, target any) error {
 	return validate.Struct(target)
 }
 
+// DecodeQuery binds query parameters and validates them with the shared validator.
+func DecodeQuery(c fiber.Ctx, target any) error {
+	if err := c.Bind().Query(target); err != nil {
+		return errQuery
+	}
+	return validate.Struct(target)
+}
+
 // PositiveID parses a path parameter and applies the shared positive-ID rule.
 func PositiveID(value string) (int, error) {
 	id, err := strconv.Atoi(value)
@@ -94,8 +103,8 @@ func Error(c fiber.Ctx, err error) error {
 		}
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": strings.Join(messages, "; ")})
 	}
-	if errors.Is(err, errJSON) {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": errJSON.Error()})
+	if errors.Is(err, errJSON) || errors.Is(err, errQuery) {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
 	}
 	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "internal server error"})
 }

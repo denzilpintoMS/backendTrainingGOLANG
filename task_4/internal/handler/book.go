@@ -54,9 +54,13 @@ func (h *BookHandler) GetByID(c fiber.Ctx) error {
 }
 
 func (h *BookHandler) List(c fiber.Ctx) error {
+	input := request.ListBooks{StartID: 1, Limit: 10}
+	if err := request.DecodeQuery(c, &input); err != nil {
+		return request.Error(c, err)
+	}
 	ctx, cancel := context.WithTimeout(c.Context(), 5*time.Second)
 	defer cancel()
-	books, err := h.books.List(ctx)
+	books, err := h.books.List(ctx, input.StartID, input.Limit)
 	if err != nil {
 		return databaseError(c, err)
 	}

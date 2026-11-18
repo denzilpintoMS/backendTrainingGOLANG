@@ -75,4 +75,16 @@ curl -X POST http://localhost:3000/api/v1/auth/login \
 
 Login returns an `access_token`, `token_type` (`Bearer`), `expires_in` (3600 seconds), and user details without the password. Invalid credentials return HTTP 401; invalid input returns HTTP 400. The signed JWT contains the user ID in `sub` and expires after one hour.
 
-`JWT_SECRET` must be configured in `.env` or the environment and contain at least 32 bytes. The existing account endpoint is still public; JWT verification middleware will be added before implementing authenticated deposits and withdrawals.
+`JWT_SECRET` must be configured in `.env` or the environment and contain at least 32 bytes. The existing account endpoint is still public; JWT middleware is available but has not yet been attached to account routes.
+
+## JWT middleware
+
+`internal/middleware.JWT(jwtSecret)` validates `Authorization: Bearer <access_token>` headers. It verifies the HS256 signature, issuer, expiration, and user ID, returning HTTP 401 for invalid tokens. Handlers can read the verified user ID as `c.Locals("user_id").(uint)`.
+
+The middleware is available but has not been attached to existing routes. To protect a route later:
+
+```go
+app.Get("/api/v1/accounts/:id", middleware.JWT(jwtSecret), handlers.AccountInfo(db))
+```
+
+Authentication identifies the user. Account ownership must also be checked separately when protecting account handlers.

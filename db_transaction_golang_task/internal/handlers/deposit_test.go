@@ -6,10 +6,7 @@ import (
 	"math"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
-	"os"
 	"strconv"
-	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -20,50 +17,11 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/google/uuid"
-	"gorm.io/driver/postgres"
-	"gorm.io/gorm"
 )
 
 // Use a separate schema so these integration checks never modify application rows.
 func TestDeposit(t *testing.T) {
-	dsn := os.Getenv("TEST_DATABASE_URL")
-	if dsn == "" {
-		t.Skip("set TEST_DATABASE_URL to run PostgreSQL integration tests")
-	}
-	admin, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	adminPool, err := admin.DB()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer adminPool.Close()
-	schema := "deposit_test_" + strings.ReplaceAll(uuid.NewString(), "-", "")
-	if err := admin.Exec("CREATE SCHEMA " + schema).Error; err != nil {
-		t.Fatal(err)
-	}
-	defer admin.Exec("DROP SCHEMA " + schema + " CASCADE")
-	dbURL, err := url.Parse(dsn)
-	if err != nil {
-		t.Fatal(err)
-	}
-	query := dbURL.Query()
-	query.Set("search_path", schema)
-	dbURL.RawQuery = query.Encode()
-	db, err := gorm.Open(postgres.Open(dbURL.String()), &gorm.Config{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	pool, err := db.DB()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer pool.Close()
-	if err := db.AutoMigrate(&models.User{}, &models.Account{}, &models.Transaction{}); err != nil {
-		t.Fatal(err)
-	}
+	db := testDatabase(t)
 
 	user := models.User{Name: "Deposit Test", Email: "deposit@example.com", Password: "unused"}
 	if err := db.Create(&user).Error; err != nil {

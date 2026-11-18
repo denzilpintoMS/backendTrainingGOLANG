@@ -113,3 +113,18 @@ TEST_DATABASE_URL="$DATABASE_URL" go test ./internal/handlers -run TestDeposit -
 ```
 
 Set `TEST_DATABASE_URL` to your local PostgreSQL URL; the test database user needs permission to create schemas. These tests are skipped when it is unset.
+
+## Withdraw
+
+```sh
+curl -X POST http://localhost:3000/api/v1/accounts/withdraw \
+  -H 'Authorization: Bearer <access_token>' \
+  -H 'Content-Type: application/json' \
+  -d '{"amount":2500}'
+```
+
+This withdraws ₹25 from the signed-in user's active account. The amount must be a positive integer in paise. The handler begins a database transaction, locks the account, checks the balance, deducts the amount, inserts a withdrawal record, and commits. An error rolls back both changes.
+
+Success returns HTTP 201 with `account_id`, the remaining `balance`, and the `transaction`. Insufficient funds or an inactive account returns HTTP 409. Other error statuses match the deposit endpoint.
+
+Run both PostgreSQL integration tests by setting `TEST_DATABASE_URL` and running `go test ./internal/handlers -run 'TestDeposit|TestWithdraw' -count=1`.

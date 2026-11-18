@@ -28,7 +28,7 @@ func Connect(dsn string) (*gorm.DB, error) {
 		sqlDB.Close()
 		return nil, fmt.Errorf("connect to postgres: %w", err)
 	}
-	if err := db.AutoMigrate(&models.User{}, &models.Account{}); err != nil {
+	if err := db.AutoMigrate(&models.User{}, &models.Account{}, &models.Transaction{}); err != nil {
 		sqlDB.Close()
 		return nil, fmt.Errorf("migrate database models: %w", err)
 	}

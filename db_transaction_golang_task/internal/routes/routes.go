@@ -14,8 +14,9 @@ func Register(app *fiber.App, db *gorm.DB, jwtSecret string) {
 	app.Get("/api/v1/health", handlers.Health(db))
 	app.Post("/api/v1/auth/register", handlers.Register(db))
 	app.Post("/api/v1/auth/login", handlers.Login(db, jwtSecret))
-	app.Get("/api/v1/accounts/:id", handlers.AccountInfo(db))
-	app.Post("/api/v1/accounts/deposit", middleware.JWT(jwtSecret), handlers.Deposit(db))
-	app.Post("/api/v1/accounts/withdraw", middleware.JWT(jwtSecret), handlers.Withdraw(db))
-	app.Post("/api/v1/accounts/transfer", middleware.JWT(jwtSecret), handlers.Transfer(db))
+	accounts := app.Group("/api/v1/accounts", middleware.JWT(jwtSecret))
+	accounts.Get("/:id", handlers.AccountInfo(db))
+	accounts.Post("/deposit", handlers.Deposit(db))
+	accounts.Post("/withdraw", handlers.Withdraw(db))
+	accounts.Post("/transfer", handlers.Transfer(db))
 }

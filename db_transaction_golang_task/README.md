@@ -1,19 +1,6 @@
 # Bank API
 
-Basic Fiber v3 API with PostgreSQL and GORM. Database name: `bank_db`.
-
-## Structure
-
-```text
-cmd/api/                Server entry point
-internal/config/        Environment configuration
-internal/database/      PostgreSQL and GORM connection pool
-internal/handlers/      HTTP handlers
-internal/routes/        Route registration
-internal/models/        Database models
-internal/repositories/  Database queries
-internal/services/      Business logic
-```
+A simple Fiber v3 API using GORM and PostgreSQL. Each user has one account. Money is stored as integer paise: `2500` means ₹25.
 
 ## Run locally
 
@@ -21,41 +8,45 @@ Use the Go version in `go.mod` and Docker Compose.
 
 ```sh
 cp .env.example .env
-# Set JWT_SECRET in .env to a random value of at least 32 bytes.
+# Set JWT_SECRET in .env to a random secret of at least 32 bytes.
 docker compose up -d --wait
 go run ./cmd/api
 ```
 
-Compose creates `bank_db` on first startup and exposes PostgreSQL at `localhost:15432` (port `5432` inside the container). If PostgreSQL already runs locally, create `bank_db` there and update `DATABASE_URL` instead of starting Compose. Environment variables take precedence over `.env`.
+PostgreSQL runs at `localhost:15432`, with database `bank_db` and local username/password `postgres`. Docker stores its data in a persistent volume. `docker compose down` preserves the data; `docker compose down -v` deletes it.
 
-```sh
-curl http://localhost:3000/
-curl http://localhost:3000/api/v1/health
+The API reads `DATABASE_URL`, `JWT_SECRET`, and `PORT` from the environment or `.env`; environment variables take precedence. Startup checks the database connection and runs AutoMigrate for User, Account, and Transaction.
+
+## Structure
+
+```text
+cmd/api/                Server entry point
+internal/config/        Environment configuration
+internal/database/      PostgreSQL connection and AutoMigrate
+internal/models/        User, Account, Transaction
+internal/handlers/      Request validation and database operations
+internal/middleware/    JWT authentication
+internal/routes/        Route registration
+internal/validator/     Request struct validation
+examples/queries.sql    SQL practice examples
 ```
 
-The health endpoint checks the database and returns HTTP 503 when unavailable. Startup requires a working database connection. Startup runs GORM AutoMigrate for the User and Account models before accepting requests. Migration errors prevent the server from starting.
+The repository and service folders are reserved for future use. Current logic stays in handlers to keep this exercise simple.
 
-```sh
-go test ./...
-go vet ./...
-docker compose down
-```
+## Endpoints
 
-The Compose credentials are local development defaults. Configure credentials and SSL in `DATABASE_URL` for other environments.
+| Method | Path | JWT required |
+| --- | --- | --- |
+| GET | `/` | No |
+| GET | `/api/v1/health` | No |
+| POST | `/api/v1/auth/register` | No |
+| POST | `/api/v1/auth/login` | No |
+| GET | `/api/v1/accounts/:id` | Yes, account owner only |
+| POST | `/api/v1/accounts/deposit` | Yes |
+| POST | `/api/v1/accounts/withdraw` | Yes |
+| POST | `/api/v1/accounts/transfer` | Yes |
 
-References: [Fiber](https://docs.gofiber.io/), [GORM PostgreSQL setup](https://gorm.io/docs/connecting_to_the_database.html).
-
-## Account information
-
-```sh
-curl http://localhost:3000/api/v1/accounts/1
-```
-
-`GET /api/v1/accounts/:id` returns the account ID, user ID, account number, balance in paise, status, creation time, and deletion time. It returns HTTP 400 for invalid IDs, 404 for missing or soft-deleted accounts, and 500 for database errors.
-
-The account table is created automatically at startup. Register a user to create an account. Authentication and account ownership checks are not yet implemented, so this development endpoint accepts any account ID.
-
-## Registration
+Register a user and automatically create an active account with zero balance:
 
 ```sh
 curl -X POST http://localhost:3000/api/v1/auth/register \
@@ -63,9 +54,9 @@ curl -X POST http://localhost:3000/api/v1/auth/register \
   -d '{"name":"Alex","email":"alex@example.com","password":"example-password"}'
 ```
 
-Registration returns HTTP 201 with the user and a new active account with zero balance. Passwords are hashed with bcrypt and excluded from responses. User and account creation happen in one database transaction. Emails are stored in lowercase; duplicates return HTTP 409. Invalid input returns HTTP 400. Passwords must contain at least 8 characters and at most 72 bytes.
+Passwords must have at least 8 characters and at most 72 bytes. They are hashed with bcrypt and excluded from responses. Emails are stored in lowercase; duplicates return HTTP 409. User and account creation commit together.
 
-## Login
+Log in to get an `access_token` valid for one hour:
 
 ```sh
 curl -X POST http://localhost:3000/api/v1/auth/login \
@@ -73,75 +64,47 @@ curl -X POST http://localhost:3000/api/v1/auth/login \
   -d '{"email":"alex@example.com","password":"example-password"}'
 ```
 
-Login returns an `access_token`, `token_type` (`Bearer`), `expires_in` (3600 seconds), and user details without the password. Invalid credentials return HTTP 401; invalid input returns HTTP 400. The signed JWT contains the user ID in `sub` and expires after one hour.
-
-`JWT_SECRET` must be configured in `.env` or the environment and contain at least 32 bytes. The existing account endpoint is still public; The deposit endpoint uses JWT middleware. The account information endpoint is still public.
-
-## JWT middleware
-
-`internal/middleware.JWT(jwtSecret)` validates `Authorization: Bearer <access_token>` headers. It verifies the HS256 signature, issuer, expiration, and user ID, returning HTTP 401 for invalid tokens. Handlers can read the verified user ID as `c.Locals("user_id").(uint)`.
-
-The deposit endpoint uses this middleware. To protect another route later:
-
-```go
-app.Get("/api/v1/accounts/:id", middleware.JWT(jwtSecret), handlers.AccountInfo(db))
-```
-
-Authentication identifies the user. Account ownership must also be checked separately when protecting account handlers.
-
-## Deposit
-
-Log in, then use the returned `access_token`:
+Send `Authorization: Bearer <access_token>` for all account routes. JWT middleware checks the HS256 signature, issuer, expiration, and user ID, then stores the ID in `c.Locals("user_id")`.
 
 ```sh
+curl http://localhost:3000/api/v1/accounts/1 \
+  -H 'Authorization: Bearer <access_token>'
+
 curl -X POST http://localhost:3000/api/v1/accounts/deposit \
   -H 'Authorization: Bearer <access_token>' \
   -H 'Content-Type: application/json' \
-  -d '{"amount":10050}'
-```
+  -d '{"amount":10000}'
 
-Amounts are integer paise: `10050` adds ₹100.50. The account is selected from the authenticated user ID; the request does not choose an account. The account must be active.
-
-A successful deposit returns HTTP 201 with `account_id`, the updated `balance`, and the deposit `transaction`. The balance update and history record commit together, with a row lock to serialize simultaneous deposits. Failed operations roll back both changes.
-
-Invalid amounts return HTTP 400, missing/invalid tokens return 401, missing accounts return 404, inactive accounts return 409, and database errors return 500. This training endpoint simulates adding funds.
-
-Deposit integration tests use a temporary PostgreSQL schema that is removed afterwards:
-
-```sh
-TEST_DATABASE_URL="$DATABASE_URL" go test ./internal/handlers -run TestDeposit -count=1
-```
-
-Set `TEST_DATABASE_URL` to your local PostgreSQL URL; the test database user needs permission to create schemas. These tests are skipped when it is unset.
-
-## Withdraw
-
-```sh
 curl -X POST http://localhost:3000/api/v1/accounts/withdraw \
   -H 'Authorization: Bearer <access_token>' \
   -H 'Content-Type: application/json' \
   -d '{"amount":2500}'
-```
 
-This withdraws ₹25 from the signed-in user's active account. The amount must be a positive integer in paise. The handler begins a database transaction, locks the account, checks the balance, deducts the amount, inserts a withdrawal record, and commits. An error rolls back both changes.
-
-Success returns HTTP 201 with `account_id`, the remaining `balance`, and the `transaction`. Insufficient funds or an inactive account returns HTTP 409. Other error statuses match the deposit endpoint.
-
-Run both PostgreSQL integration tests by setting `TEST_DATABASE_URL` and running `go test ./internal/handlers -run 'TestDeposit|TestWithdraw' -count=1`.
-
-## Transfer
-
-```sh
 curl -X POST http://localhost:3000/api/v1/accounts/transfer \
   -H 'Authorization: Bearer <access_token>' \
   -H 'Content-Type: application/json' \
   -d '{"to_account_number":"receiver-account-number","amount":2500}'
 ```
 
-This transfers ₹25 from the signed-in user's account to the specified account. Both accounts must exist and be active, the amount must be positive integer paise, and the sender must have enough funds. Transfers to the same account are rejected.
+All money endpoints use the authenticated user's account and require positive integer amounts and active accounts. Withdrawals and transfers check sufficient funds. Transfers to the same account are rejected. Deposits simulate adding funds for this exercise.
 
-The handler begins a database transaction, locks both accounts in ID order, deducts from the sender, credits the receiver, inserts one transfer record, and commits. Any error rolls back all three changes. Locking in ID order also lets opposite-direction transfers run without locking the accounts in conflicting orders.
+Each operation begins a database transaction, locks the account(s), updates balances, inserts one transaction record, and commits. `defer tx.Rollback()` undoes changes when an error occurs before commit. Transfers lock both accounts in ID order to avoid conflicting lock orders.
 
-Success returns HTTP 201 with the sender's `account_id`, remaining `balance`, and `transaction`. Invalid requests return 400, invalid authentication 401, missing accounts 404, insufficient funds or inactive accounts 409, and database failures 500.
+Success returns HTTP 201 with `account_id`, the updated sender/owner `balance`, and `transaction`. Invalid inputs return 400, invalid/missing JWTs return 401, missing or unowned accounts return 404, insufficient funds or inactive accounts return 409, and database failures return 500. Account info and health return 200 on success; health returns 503 if the database is unavailable.
 
-With `TEST_DATABASE_URL` set, run the transfer integration checks using `go test ./internal/handlers -run TestTransfer -count=1`.
+## Checks and SQL practice
+
+```sh
+go test ./...
+go vet ./...
+
+TEST_DATABASE_URL='postgres://postgres:postgres@localhost:15432/bank_db?sslmode=disable' go test ./... -count=1
+
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U postgres -d bank_db < examples/queries.sql
+```
+
+Database integration tests use temporary schemas and remove them afterwards. They cover ownership, money movements, failed operations, rollback, and concurrent requests. They are skipped when `TEST_DATABASE_URL` is unset; the test database user needs permission to create schemas.
+
+The SQL examples demonstrate CRUD, WHERE, ORDER BY, GROUP BY, inner/left joins, primary/foreign keys, and one-to-many relationships using temporary practice tables. The script rolls back its changes and leaves API records untouched. Many-to-many relationships are not needed for this design.
+
+References: [Fiber](https://docs.gofiber.io/), [GORM](https://gorm.io/docs/).

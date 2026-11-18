@@ -13,9 +13,13 @@ import (
 	"gorm.io/gorm"
 )
 
-// AccountInfo returns an account by its internal ID.
+// AccountInfo returns an account only when it belongs to the signed-in user.
 func AccountInfo(db *gorm.DB) fiber.Handler {
 	return func(c fiber.Ctx) error {
+		userID, ok := c.Locals("user_id").(uint)
+		if !ok || userID == 0 {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "unauthorized"})
+		}
 		id, err := strconv.ParseUint(c.Params("id"), 10, strconv.IntSize)
 		if err != nil || id == 0 {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
@@ -27,7 +31,7 @@ func AccountInfo(db *gorm.DB) fiber.Handler {
 		defer cancel()
 
 		var account models.Account
-		err = db.WithContext(ctx).First(&account, uint(id)).Error
+		err = db.WithContext(ctx).Where("user_id = ?", userID).First(&account, uint(id)).Error
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
 				"error": "account not found",

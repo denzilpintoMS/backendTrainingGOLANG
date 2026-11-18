@@ -128,3 +128,20 @@ This withdraws ₹25 from the signed-in user's active account. The amount must b
 Success returns HTTP 201 with `account_id`, the remaining `balance`, and the `transaction`. Insufficient funds or an inactive account returns HTTP 409. Other error statuses match the deposit endpoint.
 
 Run both PostgreSQL integration tests by setting `TEST_DATABASE_URL` and running `go test ./internal/handlers -run 'TestDeposit|TestWithdraw' -count=1`.
+
+## Transfer
+
+```sh
+curl -X POST http://localhost:3000/api/v1/accounts/transfer \
+  -H 'Authorization: Bearer <access_token>' \
+  -H 'Content-Type: application/json' \
+  -d '{"to_account_number":"receiver-account-number","amount":2500}'
+```
+
+This transfers ₹25 from the signed-in user's account to the specified account. Both accounts must exist and be active, the amount must be positive integer paise, and the sender must have enough funds. Transfers to the same account are rejected.
+
+The handler begins a database transaction, locks both accounts in ID order, deducts from the sender, credits the receiver, inserts one transfer record, and commits. Any error rolls back all three changes. Locking in ID order also lets opposite-direction transfers run without locking the accounts in conflicting orders.
+
+Success returns HTTP 201 with the sender's `account_id`, remaining `balance`, and `transaction`. Invalid requests return 400, invalid authentication 401, missing accounts 404, insufficient funds or inactive accounts 409, and database failures 500.
+
+With `TEST_DATABASE_URL` set, run the transfer integration checks using `go test ./internal/handlers -run TestTransfer -count=1`.

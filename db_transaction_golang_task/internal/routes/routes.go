@@ -17,4 +17,5 @@ func Register(app *fiber.App, db *gorm.DB, jwtSecret string) {
 	app.Get("/api/v1/accounts/:id", handlers.AccountInfo(db))
 	app.Post("/api/v1/accounts/deposit", middleware.JWT(jwtSecret), handlers.Deposit(db))
 	app.Post("/api/v1/accounts/withdraw", middleware.JWT(jwtSecret), handlers.Withdraw(db))
+	app.Post("/api/v1/accounts/transfer", middleware.JWT(jwtSecret), handlers.Transfer(db))
 }
